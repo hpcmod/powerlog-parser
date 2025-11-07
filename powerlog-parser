@@ -1,0 +1,172 @@
+#!/usr/bin/env python3
+"""Command-line interface for the powerlog parser."""
+
+from __future__ import annotations
+
+import argparse
+import logging
+import sys
+from pathlib import Path
+from typing import Iterable, List, Optional
+
+from powerlog_parser import PowerLogParser
+
+
+def build_argument_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        description="Parse power log files and produce time-series and summary reports.",
+    )
+    parser.add_argument(
+        "--config",
+        dest="config",
+        default=None,
+        help="Path to a YAML configuration file (default: ~/.powerlog.yaml).",
+    )
+    parser.add_argument(
+        "--power-log-dir",
+        dest="power_log_dir",
+        default=None,
+        help="Directory containing power log files. Overrides the config file.",
+    )
+    parser.add_argument(
+        "--nodes",
+        dest="nodes",
+        default=None,
+        help="Comma-separated list of nodes to analyse. Overrides the config file.",
+    )
+    parser.add_argument(
+        "--start-time",
+        dest="start_time",
+        required=True,
+        help="Interval start time in ISO-8601 format (e.g. 2025-11-01T00:00:00-04:00).",
+    )
+    parser.add_argument(
+        "--end-time",
+        dest="end_time",
+        required=True,
+        help="Interval end time in ISO-8601 format.",
+    )
+    parser.add_argument(
+        "-ots",
+        "--output-ts",
+        dest="output_ts",
+        default="power_timeseries_report.csv",
+        help="Path to the time-series CSV output file (default: power_timeseries_report.csv).",
+    )
+    parser.add_argument(
+        "-sum",
+        "--output-summary",
+        dest="output_summary",
+        default="power_summary_report.csv",
+        help="Path to the summary CSV output file (default: power_summary_report.csv).",
+    )
+    parser.add_argument(
+        "--max-interval-seconds",
+        dest="max_interval_seconds",
+        type=int,
+        default=None,
+        help="Maximum allowed gap between log records. Overrides the config file.",
+    )
+    parser.add_argument(
+        "--timezone",
+        dest="timezone",
+        default=None,
+        help="Timezone to assume for naive timestamps (e.g. America/New_York).",
+    )
+    parser.add_argument(
+        "--log-level",
+        dest="log_level",
+        default="INFO",
+        help="Logging verbosity (DEBUG, INFO, WARNING, ERROR).",
+    )
+    return parser
+
+
+def main(argv: Optional[List[str]] = None) -> int:
+    parser = build_argument_parser()
+    args = parser.parse_args(argv)
+
+    level = getattr(logging, args.log_level.upper(), logging.INFO)
+    logging.basicConfig(level=level, format="%(levelname)s %(message)s")
+
+    nodes = _split_nodes(args.nodes)
+
+    try:
+        parser_instance = PowerLogParser(
+            power_log_dir=args.power_log_dir,
+            nodes=nodes,
+            start_time=args.start_time,
+            end_time=args.end_time,
+            max_interval_seconds=args.max_interval_seconds,
+            config_path=args.config,
+            timezone=args.timezone,
+        )
+        time_series_df, summary_df = parser_instance.parse_logs()
+    except Exception as exc:
+        logging.error("%s", exc)
+        return 1
+
+    try:
+        _export_time_series(time_series_df, args.output_ts)
+        _export_summary(summary_df, args.output_summary)
+    except Exception as exc:  # pragma: no cover - defensive guard
+        logging.error("Failed to write outputs: %s", exc)
+        return 1
+
+    logging.info(
+        "Processed %d node(s); time-series -> %s, summary -> %s",
+        len(time_series_df["nodename"].unique()),
+        args.output_ts,
+        args.output_summary,
+    )
+    return 0
+
+
+def _split_nodes(value: Optional[str]) -> Optional[Iterable[str]]:
+    if value is None:
+        return None
+    parts = [item.strip() for item in value.split(",") if item.strip()]
+    return parts or None
+
+
+def _format_timestamp(value) -> str:
+    if value is None:
+        return ""
+    try:
+        import pandas as pd
+
+        if isinstance(value, pd.Timestamp):
+            return value.isoformat()
+    except Exception:  # pragma: no cover - defensive guard
+        pass
+    return str(value)
+
+
+def _export_time_series(df, destination: str) -> None:
+    if destination == "-":
+        output_df = df.copy()
+        output_df["timestamp"] = output_df["timestamp"].map(_format_timestamp)
+        output_df["timestamp_utc"] = output_df["timestamp_utc"].map(_format_timestamp)
+        sys.stdout.write(output_df.to_csv(index=False))
+        return
+
+    path = Path(destination)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    output_df = df.copy()
+    output_df["timestamp"] = output_df["timestamp"].map(_format_timestamp)
+    output_df["timestamp_utc"] = output_df["timestamp_utc"].map(_format_timestamp)
+    output_df.to_csv(path, index=False)
+
+
+def _export_summary(df, destination: str) -> None:
+    if destination == "-":
+        sys.stdout.write(df.to_csv(index=False))
+        return
+
+    path = Path(destination)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    df.to_csv(path, index=False)
+
+
+if __name__ == "__main__":
+    sys.exit(main())
