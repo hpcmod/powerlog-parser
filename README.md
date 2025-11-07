@@ -15,9 +15,10 @@ Python toolkit and CLI for parsing power log files, validating time-series integ
 ```bash
 mamba create -n bench-parser-py313 python=3.13 -y
 mamba activate bench-parser-py313
-mamba install pandas
+mamba install -y pandas zstandard pytest
 
 python3 -m pytest tests
+
 python3 powerlog-parser --help
 ```
 
@@ -157,7 +158,7 @@ follow the standard Python package structure.
 ```bash
 mamba create -n bench-parser-py313 python=3.13 -y
 mamba activate bench-parser-py313
-mamba install -y pandas
+mamba install -y pandas zstandard pytest
 ```
 
 

@@ -1,0 +1,4 @@
+collected_at,instant_watts,minimum_watts,maximum_watts,average_watts,ipmi_timestamp,sampling_seconds,state
+2025-11-01T00:02:00-0400,290,285,295,289,"Sat Nov  1 04:02:00 2025",00000300,activated
+2025-11-01T00:05:00-0400,295,290,300,294,"Sat Nov  1 04:05:00 2025",00000300,activated
+2025-11-01T00:07:00-0400,298,293,302,296,"Sat Nov  1 04:07:00 2025",00000300,activated
