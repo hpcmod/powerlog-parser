@@ -13,9 +13,14 @@ Python toolkit and CLI for parsing power log files, validating time-series integ
 ## Quick Start
 
 ```bash
-mamba create -n bench-parser-py313 python=3.13 -y
-mamba activate bench-parser-py313
-mamba install -y pandas zstandard pytest
+#mamba create -n bench-parser-py313 python=3.13 -y
+#mamba activate bench-parser-py313
+#mamba install -y pandas zstandard pytest
+
+# create a virtual environment with uv venv and python 3.13
+uv venv --python 3.13
+source .venv/bin/activate
+uv sync --extra dev
 
 python3 -m pytest tests
 

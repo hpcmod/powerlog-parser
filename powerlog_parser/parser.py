@@ -604,7 +604,7 @@ def _normalise_raw_frame(df: pd.DataFrame) -> pd.DataFrame:
     df = df.dropna(subset=["timestamp", "instant_watts"])
 
     if "ipmi_timestamp" in df.columns:
-        ipmi_series = pd.to_datetime(df["ipmi_timestamp"], errors="coerce")
+        ipmi_series = pd.to_datetime(df["ipmi_timestamp"], errors="coerce", utc=True)
         if ipmi_series.isna().any():
             raise ValueError("Unable to parse one or more ipmi_timestamp values")
 
@@ -620,10 +620,13 @@ def _normalise_raw_frame(df: pd.DataFrame) -> pd.DataFrame:
             ipmi_utc = ipmi_series.dt.tz_convert("UTC")
 
         drift = (timestamp_utc - ipmi_utc).abs()
-        if (drift > pd.Timedelta(seconds=1)).any():
+        if (drift > pd.Timedelta(minutes=1)).any():
             raise ValueError(
-                "ipmi_timestamp deviates from collected_at by more than one second"
+                "ipmi_timestamp deviates from collected_at by more than one minute"
             )
+
+        df["collected_at"] = timestamp_utc
+        df["timestamp"] = ipmi_utc
 
     df = df.sort_values("timestamp")
     df = df.drop_duplicates(subset=["timestamp"], keep="last")

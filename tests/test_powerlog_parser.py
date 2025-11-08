@@ -166,8 +166,8 @@ def test_ipmi_timestamp_mismatch_raises(tmp_path: Path) -> None:
     log_path = log_dir / "2025-11-01.log"
     log_path.write_text(
         "collected_at,instant_watts,ipmi_timestamp\n"
-        "2025-11-01T00:00:00-0400,100,\"Sat Nov  1 04:00:05 2025\"\n"
-        "2025-11-01T00:05:00-0400,110,\"Sat Nov  1 04:05:05 2025\"\n",
+        "2025-11-01T00:00:00-0400,100,\"Sat Nov  1 04:02:05 2025\"\n"
+        "2025-11-01T00:05:00-0400,110,\"Sat Nov  1 04:07:05 2025\"\n",
         encoding="utf-8",
     )
 
@@ -180,6 +180,46 @@ def test_ipmi_timestamp_mismatch_raises(tmp_path: Path) -> None:
 
     with pytest.raises(ValueError, match="ipmi_timestamp"):
         parser.parse_logs()
+
+
+def test_ipmi_timestamp_preferred_for_time_axis(tmp_path: Path) -> None:
+    log_dir = tmp_path / "nodeY" / "2025" / "11"
+    log_dir.mkdir(parents=True, exist_ok=True)
+    log_path = log_dir / "2025-11-01.log"
+    log_path.write_text(
+        "collected_at,instant_watts,ipmi_timestamp\n"
+        "2025-11-01T00:00:00-0400,100,\"Sat Nov  1 03:59:30 2025\"\n"
+        "2025-11-01T00:05:00-0400,120,\"Sat Nov  1 04:04:30 2025\"\n"
+        "2025-11-01T00:10:00-0400,140,\"Sat Nov  1 04:09:30 2025\"\n"
+        "2025-11-01T00:15:00-0400,160,\"Sat Nov  1 04:15:30 2025\"\n",
+        encoding="utf-8",
+    )
+
+    parser = PowerLogParser(
+        power_log_dir=tmp_path,
+        nodes=["nodeY"],
+        start_time="2025-11-01T00:00:00-04:00",
+        end_time="2025-11-01T00:10:00-04:00",
+    )
+
+    time_series_df, _ = parser.parse_logs()
+
+    recorded = (
+        time_series_df[time_series_df["point_type"] == "recorded"]
+        .sort_values("timestamp_utc")
+        .reset_index(drop=True)
+    )
+
+    expected = [
+        pd.Timestamp("2025-11-01T04:04:30Z"),
+        pd.Timestamp("2025-11-01T04:09:30Z"),
+    ]
+
+    assert recorded["timestamp_utc"].tolist() == expected
+
+    interpolated = time_series_df[time_series_df["point_type"] == "interpolated"]
+    assert (interpolated["timestamp_utc"] == pd.Timestamp("2025-11-01T04:00:00Z")).any()
+    assert (interpolated["timestamp_utc"] == pd.Timestamp("2025-11-01T04:10:00Z")).any()
 
 
 def test_ipmi_timestamp_dataset_mismatch() -> None:
