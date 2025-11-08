@@ -131,6 +131,7 @@ class PowerLogParser:
             raise FileNotFoundError(f"No log files found for node '{node}'")
 
         frames: List[pd.DataFrame] = []
+        
         for path in paths:
             frame = _read_log_file(path)
             if frame is None:
@@ -355,7 +356,9 @@ class PowerLogParser:
 
         node_dir = base / node
         search_roots = [node_dir, base]
-        dates = _enumerate_dates(self._start_date_hint, self._end_date_hint)
+        expanded_start = self._start_date_hint - pd.Timedelta(days=1)
+        expanded_end = self._end_date_hint + pd.Timedelta(days=1)
+        dates = _enumerate_dates(expanded_start, expanded_end)
 
         for root in search_roots:
             if not root.exists():
@@ -383,10 +386,10 @@ class PowerLogParser:
                         yield candidate
 
         # As a fallback, traverse nexted directories but keep it contained.
-        for globbed in base.glob("**/*"):
-            if globbed.is_file() and any(globbed.name.endswith(ext) for ext in _SUPPORTED_EXTENSIONS):
-                if node in globbed.parts or node_dir in globbed.parents:
-                    yield globbed
+        #for globbed in base.glob("**/*"):
+        #    if globbed.is_file() and any(globbed.name.endswith(ext) for ext in _SUPPORTED_EXTENSIONS):
+        #        if node in globbed.parts or node_dir in globbed.parents:
+        #            yield globbed
 
     def _derive_local_date(self, timestamp: pd.Timestamp) -> pd.Timestamp:
         if timestamp.tzinfo is not None:
