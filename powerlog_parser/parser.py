@@ -104,8 +104,8 @@ class PowerLogParser:
         self._start_date_hint = self._derive_local_date(self._start_local)
         self._end_date_hint = self._derive_local_date(self._end_local)
 
-    def parse_logs(self) -> Tuple[pd.DataFrame, pd.DataFrame]:
-        """Parse logs and return (time_series, summary) data frames."""
+    def parse_logs(self) -> Tuple[pd.DataFrame, pd.DataFrame, Dict[str, float]]:
+        """Parse logs and return time series, per-node summary, and overall summary."""
         node_results: List[NodeResult] = []
 
         for node in self._nodes:
@@ -119,12 +119,11 @@ class PowerLogParser:
             [result.time_series for result in node_results], ignore_index=True
         ).sort_values(["timestamp", "nodename"])
 
-        node_summary_rows = [result.summary for result in node_results]
+        summary_by_nodes_rows = [result.summary for result in node_results]
         combined_summary = self._build_combined_summary(node_results)
-        summary_rows = node_summary_rows + [combined_summary]
-        summary_df = pd.DataFrame(summary_rows)
+        summary_by_nodes_df = pd.DataFrame(summary_by_nodes_rows)
 
-        return time_series_df.reset_index(drop=True), summary_df
+        return time_series_df.reset_index(drop=True), summary_by_nodes_df, combined_summary
 
     def _parse_node(self, node: str) -> NodeResult:
         paths = list(self._discover_candidate_files(node))

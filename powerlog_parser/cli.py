@@ -100,14 +100,16 @@ def main(argv: Optional[List[str]] = None) -> int:
             config_path=args.config,
             timezone=args.timezone,
         )
-        time_series_df, summary_df = parser_instance.parse_logs()
+        time_series_df, summary_by_node_df, summary_df = parser_instance.parse_logs()
     except Exception as exc:
         logging.error("%s", exc)
         return 1
 
     try:
         _export_time_series(time_series_df, args.output_ts)
-        _export_summary(summary_df, args.output_summary)
+        _export_summary(summary_by_node_df, args.output_summary)
+        from pprint import pprint
+        pprint(summary_df)
     except Exception as exc:  # pragma: no cover - defensive guard
         logging.error("Failed to write outputs: %s", exc)
         return 1

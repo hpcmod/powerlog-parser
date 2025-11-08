@@ -34,7 +34,7 @@ def test_parse_multiple_nodes() -> None:
         end_time=DEFAULT_END,
     )
 
-    time_series_df, summary_df = parser.parse_logs()
+    time_series_df, summary_df, combined_summary = parser.parse_logs()
 
     assert set(time_series_df["nodename"].unique()) == set(DEFAULT_NODES)
 
@@ -47,7 +47,7 @@ def test_parse_multiple_nodes() -> None:
 
     node1_summary = summary_df[summary_df["nodename"] == "fj-aox01"].iloc[0]
     node2_summary = summary_df[summary_df["nodename"] == "fj-aox02"].iloc[0]
-    combined_summary = summary_df[summary_df["nodename"] == "ALL"].iloc[0]
+    assert combined_summary["nodename"] == "ALL"
 
     def _expected_avg(series_df: pd.DataFrame, total_energy_kwh: float) -> float:
         duration_seconds = (
@@ -124,12 +124,12 @@ def test_multi_day_zstd_sources() -> None:
         end_time="2025-11-01T00:06:00-04:00",
     )
 
-    time_series_df, summary_df = parser.parse_logs()
+    time_series_df, summary_df, combined_summary = parser.parse_logs()
 
     earliest = time_series_df["timestamp_utc"].min()
     assert earliest < pd.Timestamp("2025-11-01T04:00:00Z")
     assert set(time_series_df["nodename"].unique()) == set(DEFAULT_NODES)
-    assert "ALL" in summary_df["nodename"].values
+    assert combined_summary["nodename"] == "ALL"
 
 
 def test_timezone_spanning_interval() -> None:
@@ -141,11 +141,11 @@ def test_timezone_spanning_interval() -> None:
         max_interval_seconds=7200,
     )
 
-    time_series_df, summary_df = parser.parse_logs()
+    time_series_df, summary_df, combined_summary = parser.parse_logs()
 
     assert set(time_series_df["nodename"].unique()) == set(DEFAULT_NODES)
     assert set(time_series_df["point_type"].unique()) <= {"recorded", "interpolated"}
-    assert summary_df.loc[summary_df["nodename"] == "ALL", "total_energy_kwh"].iloc[0] > 0
+    assert combined_summary["total_energy_kwh"] > 0
 
 
 def test_no_data_in_interval_raises() -> None:
@@ -202,7 +202,7 @@ def test_ipmi_timestamp_preferred_for_time_axis(tmp_path: Path) -> None:
         end_time="2025-11-01T00:10:00-04:00",
     )
 
-    time_series_df, _ = parser.parse_logs()
+    time_series_df, _, _ = parser.parse_logs()
 
     recorded = (
         time_series_df[time_series_df["point_type"] == "recorded"]
